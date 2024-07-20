@@ -17,8 +17,6 @@ const cabSchema = new mongoose.Schema({
     },
     type:{
         type:String,
-        enum: ["4seater", "6seater","7seater"],
-        default: "4seater",
     },
     capacity: {
         type: Number,
@@ -35,6 +33,11 @@ const cabSchema = new mongoose.Schema({
         required: true,
     },
     photos: [imageSchema],
+
+    cabNumber:{
+        type:String,
+        require:true,
+    },
 
     avalibility: {
         type: String,
@@ -56,4 +59,4 @@ const cabSchema = new mongoose.Schema({
 });
 
 
-export const Cab = mongoose.model("Cab", cabSchema);
+export const Cab = mongoose.models.Cab || mongoose.model("Cab", cabSchema);

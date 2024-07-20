@@ -39,6 +39,8 @@ import userRoute from './routes/UserRoutes.js';
 import cabRoute from './routes/CabRoutes.js';
 import adminRoute from './routes/AdminRoutes.js';
 import orderRoute from './routes/OrderRoute.js';
+import driverRoute from './routes/DriverRoutes.js';
+
 
 
 
@@ -46,7 +48,9 @@ import orderRoute from './routes/OrderRoute.js';
 app.use("/api/v1/user", userRoute);
 app.use("/api/v1/cab", cabRoute);
 app.use("/api/v1/order", orderRoute);
+app.use("/api/v1/driver", driverRoute);
 app.use("/admin/v1", adminRoute);
+
 
 
 

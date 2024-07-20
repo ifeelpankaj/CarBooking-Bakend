@@ -3,11 +3,10 @@ import { User } from "../models/UserModel.js";
 import { sendMail } from "../utils/sendEmail.js";
 import { sendToken } from "../utils/sendToken.js";
 import cloudinary from "cloudinary";
-import { Order } from "../models/OrderModel.js";
 
 export const register = async (req, res) => {
   try {
-    const { username, email, password, phoneNumber } = req.body;
+    const { username, email, password, phoneNumber,role } = req.body;
 
     let user = await User.findOne({ email });
 
@@ -39,6 +38,7 @@ export const register = async (req, res) => {
       email,
       password,
       phoneNumber,
+      role,
       otp,
       otp_expiry: new Date(Date.now() + process.env.OTP_EXPIRE * 60 * 1000),
     });
@@ -258,21 +258,32 @@ export const updateProfile = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
 
-    const { name } = req.body;
-    const avatar = req.files.avatar.tempFilePath;
-    //
+    const { name, phoneNumber } = req.body;
+
     if (name) {
-      user.name = name;
+      user.username = name;
+    }
+    if (phoneNumber) {
+      user.phoneNumber = phoneNumber;
     }
 
-    if (avatar) {
+    if (req.files && req.files.avatar) {
+      const avatar = req.files.avatar;
 
+      // Delete old avatar from cloudinary if it exists
+      if (user.avatar && user.avatar.public_id) {
+        await cloudinary.v2.uploader.destroy(user.avatar.public_id);
+      }
 
-      const myCloud = await cloudinary.v2.uploader.upload(avatar, {
+      // Upload new avatar
+      const myCloud = await cloudinary.v2.uploader.upload(avatar.tempFilePath, {
         folder: "TandT",
         resource_type: "image",
       });
-      fs.rmSync("./tmp", { recursive: true });
+
+      // Remove temporary file
+      fs.unlinkSync(avatar.tempFilePath);
+
       user.avatar = {
         public_id: myCloud.public_id,
         url: myCloud.secure_url,
@@ -293,20 +304,31 @@ export const updateProfile = async (req, res) => {
   }
 };
 
-export const getMyBookings = async (req, res, next) => {
+
+export const getProfileById = async (req, res) => {
   try {
-    const orders = await Order.find({ userId: req.user._id })
-     .populate({ path: "userId", select: "name" })
-     .select("-__v")
-     .lean();
-    res.status(200).json({
-      success: true,
-      orders,
-    });
+    // Extracting ID from request body
+    const { id } = req.params;
+
+    // Ensure the ID is provided
+    if (!id) {
+      return res.status(400).json({ success: false, message: "ID is required" });
+    }
+
+    const user = await User.findById(id);
+
+    if (!user) {
+      // Handle the case where no user is found
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    // Assuming sendToken is a function that sends a response with a token and other details
+    sendToken(res, user, 200, `Welcome back ${user.username}`);
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'An error occurred while fetching bookings.' });
+    // Catch any unexpected errors
+    res.status(500).json({ success: false, message: error.message });
   }
-  
 };
+
+
 

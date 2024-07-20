@@ -10,16 +10,20 @@ export const sendToken = (res, user, statusCode, message, deletionToken) => {
   
     const userData = {
       _id: user._id,
-      name: user.name,
+      name: user.username,
       email: user.email,
       avatar: user.avatar,
+      phoneNo:user.phoneNumber,
       role:user.role,
       verified: user.isVerified,
+      documented:user.isDocumentSubmited,
+      driver:user.isVerifiedDriver,
+      haveCab:user.haveCab,
     };
   
     res
       .status(statusCode)
       .cookie("token", token, options)
-      .cookie("deletionToken", deletionToken, options) // Set the deletion token as a cookie
+      // .cookie("deletionToken", deletionToken, options) 
       .json({ success: true, message, user: userData });
   };

@@ -1,7 +1,7 @@
 import fs from "fs";
 import cloudinary from "cloudinary";
 import { User } from "../models/UserModel.js";
-import { Cab } from "../models/cabModel.js";
+import { Cab } from "../models/CabModel.js";
 import { sendMail } from "../utils/sendEmail.js";
 import { Cachestorage } from "../app.js";
 import NodeCache from "node-cache";
@@ -57,17 +57,21 @@ export const registerCab = async (req, res) => {
       });
     }
 
+    const belongsTo = await User.findById(req.user._id);
     const carData = {
       modelName: req.body.modelName,
       feature: req.body.feature,
       capacity: req.body.capacity,
       belongsTo: req.user._id,
+      cabNumber: req.body.cabNumber,
       rate: req.body.rate,
       photos: uploadedImages,  // Include the uploaded images
     };
 
     const car = await Cab.create(carData);
-    const belongsTo = await User.findById(req.user._id);
+
+    // Update user's haveCab field
+    await User.findByIdAndUpdate(req.user._id, { haveCab: true });
 
     // Remove tmp directory after successful upload and database operations
     fs.rmSync("./tmp", { recursive: true });
@@ -75,7 +79,9 @@ export const registerCab = async (req, res) => {
     // Send email notification
     const emailContent = `Your Car "${car.modelName}" has been Registered successfully.`;
     await sendMail(belongsTo.email, "Car Registered Successfully", emailContent);
-    Cachestorage.del(['all_cabs', 'all_cabs_user']);
+
+    Cachestorage.del(['all_cabs', 'all_cabs_user','driver_cabs']);
+
     res.status(201).json({
       success: true,
       message: "Car Registered Successfully",
@@ -190,7 +196,7 @@ export const updateCab = async (req, res) => {
       }
     );
 
-    Cachestorage.del(['all_cabs', 'all_cabs_user']);
+    Cachestorage.del(['all_cabs', 'all_cabs_user', 'driver_cabs']);
 
     res.status(200).json({
       success: true,
@@ -229,7 +235,7 @@ export const getAllCabs = async (req, res) => {
       // console.log(cabs);
     } else {
       cabs = await Cab.find({ avalibility: "Avaliable", isReady: true })
-        .populate('belongsTo', 'name email')
+        .populate('username', 'phoneNumber')
         .select('-__v');
       const cacheKey = "all_cabs_user";
       Cachestorage.set(cacheKey, JSON.stringify(cabs));
@@ -255,7 +261,7 @@ export const getAllCabs = async (req, res) => {
   }
 };
 
-export const getCab = async(req,res,next) =>{
+export const getCab = async(req,res) =>{
   const cabCache = new NodeCache({ stdTTL: 300 });
   try {
     const cachedCab = cabCache.get(req.params.id);
@@ -284,3 +290,35 @@ export const getCab = async(req,res,next) =>{
     next(error);
   }
 }
+
+export const getDriverCabs = async(req,res) =>{
+  try {
+    let driverCabs;
+    Cachestorage.del(['driver_cabs'])
+    if(Cachestorage.has("driver_cabs")){
+      driverCabs = JSON.parse(Cachestorage.get("driver_cabs"));
+    }else{
+      driverCabs = await Cab.find({belongsTo:req.user._id}).select('-_v');
+      const cacheKey = "driver_cabs";
+      Cachestorage.set(cacheKey,JSON.stringify(driverCabs));
+    }
+    if(driverCabs.length === 0){
+      return res.status(404).json({
+        success:false,
+        message:"No Ride found",
+      })
+    }
+    res.status(200).json({
+      success: true,
+      count: driverCabs.length,
+      driverCabs,
+    });
+     
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching available cabs",
+      error: error.message,
+    });
+  }
+};

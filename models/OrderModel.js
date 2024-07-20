@@ -9,7 +9,7 @@ const orderSchema = new mongoose.Schema({
     bookedCab:{
         type: mongoose.Schema.ObjectId,
         ref: "Cab",
-        // required: true,
+        required: true,
     },
     
     bookingType:{
@@ -25,6 +25,9 @@ const orderSchema = new mongoose.Schema({
     pickupLocation: {
         type: String,
         required: true
+    },
+    exactLocation:{
+        type:String
     },
     destination: {
         type: String,
@@ -57,6 +60,12 @@ const orderSchema = new mongoose.Schema({
     }],
     bookingAmount:{
         type:Number
+    },
+    paidAmount:{
+        type:Number
+    },
+    razorpayOrderId: {
+        type: String,
     },
    
     createdAt: {

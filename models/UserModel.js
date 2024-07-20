@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 import argon2 from "argon2";
 import jwt from "jsonwebtoken";
 
+
+
 const userSchema = new mongoose.Schema({
 
     username: {
@@ -27,6 +29,28 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    isVerifiedDriver: {
+        type: Boolean,
+        default: false,
+    },
+    isDocumentSubmited:{
+        type:Boolean,
+        default:false,
+    },
+    driverDocuments: [{
+        docName: String,
+        public_id: String,
+        url: String,
+        uploadedAt: {
+            type: Date,
+            default: Date.now,
+        },
+    }],
+    haveCab:{
+        type:Boolean,
+        default:false,
+    },
+
     avatar: {
         public_id: String,
         url: String,
@@ -73,6 +97,10 @@ userSchema.methods.verifyPassword = async function (plainTextPassword) {
         return false;
     }
 };
+userSchema.methods.hasCab = async function() {
+    const cab = await Cab.findOne({ belongsTo: this._id });
+    return !!cab; // Returns true if a cab is found, false otherwise
+  };
 
 userSchema.index({ otp_expiry: 1 }, { expireAfterSeconds: 0 });
 

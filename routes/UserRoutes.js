@@ -1,5 +1,5 @@
 import express from "express";
-import { getMyBookings, login, logout, myProfile, register, updateProfile, verify } from "../controllers/UserController.js";
+import {  getProfileById, login, logout, myProfile, register, updateProfile, verify } from "../controllers/UserController.js";
 import { isAuthenticated } from "../middleware/auth.js";
 
 
@@ -15,11 +15,14 @@ router.route("/login").post(login);
 
 router.route("/logout").get(logout);
 
-router.route("/modify/profile").put(isAuthenticated, updateProfile);
+router.route("/modify").put(isAuthenticated, updateProfile);
 
 router.route("/me").get(isAuthenticated, myProfile);
 
-router.route("/mybooking").get(isAuthenticated, getMyBookings);
+router.route("/userById/:id").get(isAuthenticated, getProfileById);
+
+
+
 
 
 
