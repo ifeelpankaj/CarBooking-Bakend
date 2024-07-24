@@ -322,8 +322,7 @@ export const getProfileById = async (req, res) => {
       return res.status(404).json({ success: false, message: "User not found" });
     }
 
-    // Assuming sendToken is a function that sends a response with a token and other details
-    sendToken(res, user, 200, `Welcome back ${user.username}`);
+    res.status(200).json({ success: true, user });
   } catch (error) {
     // Catch any unexpected errors
     res.status(500).json({ success: false, message: error.message });

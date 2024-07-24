@@ -3,7 +3,9 @@ import { instance } from "../server.js";
 import {Payment} from "../models/PaymentModel.js";
 import  crypto from "node:crypto";
 import NodeCache from "node-cache";
+import { Cachestorage } from "../app.js";
 
+//pending_orders
 export const bookCab = async (req, res, next) => {
   
 
@@ -73,8 +75,9 @@ export const bookCab = async (req, res, next) => {
       razorpayOrderId,
     };
 
+    // CacheStorage.del(['pending_orders']);  
+    Cachestorage.del(['pending_orders']);
     const order = await Order.create(orderOptions);
-
 
     res.status(201).json({
       success: true,
@@ -187,5 +190,42 @@ export const getOrderDetail = async(req,res,next)=>{
     })
   } catch (error) {
     next(error);
+  }
+}
+
+export const  getAllPendingOrder = async(req,res,next) =>{
+  try {
+    if (req.user.role !== "Driver" && req.user.role !== "Admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only Drivers are allowed to register their car here.",
+      });
+    }
+
+    let orders;
+    if(Cachestorage.has('pending_orders')){
+      orders = JSON.parse(Cachestorage.get('pending_orders'));
+    }else{
+      orders = await Order.find({bookingStatus : "Pending"}).select('-_v');
+      const cacheKey = 'pending_orders';
+      Cachestorage.set(cacheKey,JSON.stringify(orders));
+    }
+    if(orders.length === 0){
+      return res.status(200).json({
+        success: true,
+        message:"No Order Found",
+      })
+    }
+    res.status(200).json({
+      success: true,
+      count: orders.length,
+      orders,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error fetching pending orders",
+      error: error.message,
+    });
   }
 }

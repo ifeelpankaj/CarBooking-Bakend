@@ -1,11 +1,13 @@
 import fs from "fs";
 import cloudinary from "cloudinary";
 import { User } from "../models/UserModel.js";
-import { Cab } from "../models/CabModel.js";
+// import { Cab } from "../models/CabModel.js";
 import { sendMail } from "../utils/sendEmail.js";
 import { Cachestorage } from "../app.js";
 import NodeCache from "node-cache";
-
+import axios from'axios';
+import { Cab } from "../models/cabModel.js";
+//driver_cabs
 
 export const registerCab = async (req, res) => {
   try {
@@ -183,6 +185,7 @@ export const updateCab = async (req, res) => {
       modelName: req.body.modelName,
       feature: req.body.feature,
       capacity: req.body.capacity,
+      cabNumber:req.body.cabNumber,
       photos: uploadedImages,
     };
 
@@ -235,7 +238,6 @@ export const getAllCabs = async (req, res) => {
       // console.log(cabs);
     } else {
       cabs = await Cab.find({ avalibility: "Avaliable", isReady: true })
-        .populate('username', 'phoneNumber')
         .select('-__v');
       const cacheKey = "all_cabs_user";
       Cachestorage.set(cacheKey, JSON.stringify(cabs));
@@ -293,8 +295,13 @@ export const getCab = async(req,res) =>{
 
 export const getDriverCabs = async(req,res) =>{
   try {
+    if (req.user.role !== "Driver" && req.user.role !== "Admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only Drivers are allowed to register their car here.",
+      });
+    }
     let driverCabs;
-    Cachestorage.del(['driver_cabs'])
     if(Cachestorage.has("driver_cabs")){
       driverCabs = JSON.parse(Cachestorage.get("driver_cabs"));
     }else{
@@ -320,5 +327,83 @@ export const getDriverCabs = async(req,res) =>{
       message: "Error fetching available cabs",
       error: error.message,
     });
+  }
+};
+
+export const deleteCab  =  async(req,res) =>{
+  try {
+    if (req.user.role !== "Driver" && req.user.role !== "Admin") {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied. Only Drivers are allowed to register their car here.",
+      });
+    }
+      const {id} = req.params;
+      const cabs  =  await Cab.findById(id);
+
+      if(!cabs){
+        return res.status(404).json({
+          success: false,
+          message: "Cab Not Found",
+        });
+      }
+
+      for (let index = 0; index < cabs.photos.length; index++) {
+        await cloudinary.v2.uploader.destroy(cabs.photos[index].public_id);
+      }
+      await Cab.deleteOne({ _id: id });
+
+      Cachestorage.del(['all_cabs', 'all_cabs_user', 'driver_cabs']);
+
+      const left = await Cab.find({belongsTo:req.user._id}).select('-_v'); 
+
+      if(left.length < 1){
+        await User.findByIdAndUpdate(req.user._id, { haveCab: false });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "Cab Deleted Successfully",
+      });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: "Error deleting Cab",
+      error: error.message,
+    });
+  }
+}
+
+
+
+export const calculateDistance = async (req, res) => {
+  const { origin, destination } = req.query;
+  const apiKey = process.env.GOOGLE_MAPS_API_KEY;
+
+  try {
+    const response = await axios.get(`https://maps.googleapis.com/maps/api/distancematrix/json`, {
+      params: {
+        origins: origin,
+        destinations: destination,
+        key: apiKey
+      }
+    });
+
+    const data = response.data;
+
+    if (data.status === 'OK' && data.rows[0].elements[0].status === 'OK') {
+      const distance = data.rows[0].elements[0].distance.text;
+      const duration = data.rows[0].elements[0].duration.text;
+
+      res.json({
+        distance,
+        duration
+      });
+    } else {
+      res.status(400).json({ error: 'Unable to calculate distance' });
+    }
+  } catch (error) {
+    console.error('Error calculating distance:', error);
+    res.status(500).json({ error: 'An error occurred while fetching the distance' });
   }
 };

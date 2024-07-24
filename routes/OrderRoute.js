@@ -1,5 +1,5 @@
 import express from "express";
-import { bookCab, getMyBookings, getOrderDetail, paymentVerification } from "../controllers/OrderController.js";
+import { bookCab, getAllPendingOrder, getMyBookings, getOrderDetail, paymentVerification } from "../controllers/OrderController.js";
 import { isAuthenticated } from "../middleware/auth.js";
 
 
@@ -13,6 +13,9 @@ router.route("/paymentVerification").post(isAuthenticated,paymentVerification);
 router.route("/mybooking").get(isAuthenticated, getMyBookings);
 
 router.route("/mybooking/:id").get(isAuthenticated, getOrderDetail);
+
+
+router.route("/pendingorders").get(isAuthenticated, getAllPendingOrder);
 
 
 export default router;
