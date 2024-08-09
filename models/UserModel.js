@@ -9,7 +9,6 @@ const userSchema = new mongoose.Schema({
     username: {
         type: String,
         required: true,
-        unique: true,
     },
     password: {
         type: String,
@@ -97,10 +96,6 @@ userSchema.methods.verifyPassword = async function (plainTextPassword) {
         return false;
     }
 };
-userSchema.methods.hasCab = async function() {
-    const cab = await Cab.findOne({ belongsTo: this._id });
-    return !!cab; // Returns true if a cab is found, false otherwise
-  };
 
 userSchema.index({ otp_expiry: 1 }, { expireAfterSeconds: 0 });
 

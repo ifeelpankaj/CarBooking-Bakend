@@ -1,7 +1,7 @@
 import express from "express";
 
 import { isAuthenticated } from "../middleware/auth.js";
-import { calculateDistance, deleteCab, getAllCabs, getCab, getDriverCabs, registerCab, updateCab } from "../controllers/CabController.js";
+import { calculateDistance, deleteCab, getAllCabs, getCab, getCabWithUpcomingBookings, getDriverCabs, registerCab, updateCab } from "../controllers/CabController.js";
 
 
 const router = express.Router();
@@ -21,6 +21,9 @@ router.route("/getRide").get(isAuthenticated,getDriverCabs);
 router.route("/getRide/:id").delete(isAuthenticated,deleteCab);
 
 router.route("/calculate-distance").get(isAuthenticated,calculateDistance);
+
+router.route("/get-upcomming-booking/:cabId").get(isAuthenticated,getCabWithUpcomingBookings);
+
 
 
 

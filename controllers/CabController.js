@@ -7,6 +7,7 @@ import { Cachestorage } from "../app.js";
 import NodeCache from "node-cache";
 import axios from'axios';
 import { Cab } from "../models/cabModel.js";
+import { Order } from "../models/OrderModel.js";
 //driver_cabs
 
 export const registerCab = async (req, res) => {
@@ -230,15 +231,13 @@ export const updateCab = async (req, res) => {
 
 export const getAllCabs = async (req, res) => {
   try {
-
-
     let cabs;
+    // Cachestorage.del(['all_cabs_user'])
     if (Cachestorage.has("all_cabs_user")) {
       cabs = JSON.parse(Cachestorage.get("all_cabs_user"));
-      // console.log(cabs);
     } else {
-      cabs = await Cab.find({ avalibility: "Avaliable", isReady: true })
-        .select('-__v');
+      cabs = await Cab.find({ isReady: true });
+
       const cacheKey = "all_cabs_user";
       Cachestorage.set(cacheKey, JSON.stringify(cabs));
     }
@@ -405,5 +404,48 @@ export const calculateDistance = async (req, res) => {
   } catch (error) {
     console.error('Error calculating distance:', error);
     res.status(500).json({ error: 'An error occurred while fetching the distance' });
+  }
+};
+
+
+export const getCabWithUpcomingBookings = async (req, res) => {
+  try {
+    const { cabId } = req.params;
+
+    // Find the cab
+    const cab = await Cab.findById(cabId);
+
+    if (!cab) {
+      return res.status(404).json({ message: "Cab not found" });
+    }
+
+    // Find upcoming orders for this cab
+    const upcomingOrders = await Order.find({
+      bookedCab: cabId,
+      departureDate: { $gte: new Date() },
+      bookingStatus: { $in: ['Pending', 'Confirmed','Assigned'] }
+    }).sort({ departureDate: 1 });
+
+    // Update the cab's upcomingBookings
+    cab.upcomingBookings = upcomingOrders.map(order => order._id);
+    await cab.save();
+
+    // Prepare the response
+    const upcomingBookings = upcomingOrders.map(order => ({
+      orderId: order._id,
+      departureDate: order.departureDate,
+      pickupLocation: order.pickupLocation,
+      destination: order.destination,
+      bookingStatus: order.bookingStatus
+    }));
+
+    res.status(200).json({
+      success: true,
+      upcomingBookings
+    });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Server error", error: error.message });
   }
 };

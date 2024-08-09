@@ -3,19 +3,22 @@ import { User } from "../models/UserModel.js";
 import { sendMail } from "../utils/sendEmail.js";
 import { sendToken } from "../utils/sendToken.js";
 import cloudinary from "cloudinary";
+import { Cachestorage } from "../app.js";
+
 
 export const register = async (req, res) => {
   try {
-    const { username, email, password, phoneNumber,role } = req.body;
+    const { username, email, password, phoneNumber, role } = req.body;
 
-    let user = await User.findOne({ email });
+    let user = await User.findOne({ $or: [{ email }, { phoneNumber }] });
 
     if (user) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Already have an account,Please Sign in" });
+      if (user.email === email) {
+        return res.status(400).json({ success: false, message: "Already have an account, Please Sign in" });
+      } else {
+        return res.status(400).json({ success: false, message: "Number already Present in our record.." });
+      }
     }
-
     function generateNumericOTP(length) {
       let digits = '123456789';
       let otp = 0; // Initialize otp as a number
@@ -42,6 +45,7 @@ export const register = async (req, res) => {
       otp,
       otp_expiry: new Date(Date.now() + process.env.OTP_EXPIRE * 60 * 1000),
     });
+
 
     await sendMail(email, "Verify Your Account - One-Time Password (OTP)",
       `<html>
@@ -100,7 +104,7 @@ export const register = async (req, res) => {
           </div>
         </body>
       </html>`);
-
+      Cachestorage.del(['all_user','all_drivers']);
     sendToken(
       res,
       user,
@@ -289,7 +293,7 @@ export const updateProfile = async (req, res) => {
         url: myCloud.secure_url,
       };
     }
-
+    Cachestorage.del(['all_user','all_drivers']);
     await user.save();
 
     res.status(200).json({

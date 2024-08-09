@@ -21,7 +21,10 @@ const orderSchema = new mongoose.Schema({
         type: Date,
         required: true
     },
-
+    dropOffDate: {
+        type: Date,
+        // required: true
+    },
     pickupLocation: {
         type: String,
         required: true
@@ -39,7 +42,7 @@ const orderSchema = new mongoose.Schema({
     },
     bookingStatus: {
         type: String,
-        enum: ['Pending', 'Confirmed', 'Completed', 'Cancelled'],
+        enum: ['Pending', "Assigning",'Confirmed', 'Completed', 'Cancelled'],
         default: 'Pending'
     },
     paymentMethod: {
@@ -64,15 +67,86 @@ const orderSchema = new mongoose.Schema({
     paidAmount:{
         type:Number
     },
+    driverShare:[{
+        driverCut: {
+            type: Number,
+        },
+        Via:{
+            type:String,
+        },
+        status:{
+            type: String,
+            default: "UnPaid",
+        },
+        paidAt: {
+            type: Date,
+            default: Date.now,
+        },  
+    }],
+    driverId:{
+        type: mongoose.Schema.ObjectId,
+        ref: "User",
+    },
     razorpayOrderId: {
         type: String,
     },
-   
+    order_expire:Date,
+
     createdAt: {
         type: Date,
         default: Date.now,
     },  
 });
+// orderSchema.pre('save', async function(next) {
+//     if (this.isNew || (this.paymentStatus === 'Pending' && (this.paymentMethod === 'Online' || this.paymentMethod === 'Hybrid'))) {
+//       try {
+//         // Update Order
+//         const updatedOrders = await Order.updateMany(
+//           {
+//             _id: { $ne: this._id },
+//             paymentStatus: 'Pending',
+//             paymentMethod: { $in: ['Online', 'Hybrid'] }
+//           },
+//           {
+//             $set: {
+//               paymentStatus: 'Failed',
+//               bookingStatus: 'Cancelled'
+//             }
+//           }
+//         );
+//         console.log(`Updated ${updatedOrders.modifiedCount} orders.`);
+//       } catch (error) {
+//         console.error('Error updating unpaid orders:', error);
+//         return next(error);
+//       }
+//     }
+//     return next();
+//   });
 
+  // orderSchema.methods.checkBooking = async function(next) {
+  //   try {
+  //     // Update orders
+  //     const updatedOrders = await Order.updateMany(
+  //       {
+  //         _id: { $ne: this._id },
+  //         paymentStatus: 'Pending',
+  //         paymentMethod: { $in: ['Online', 'Hybrid'] }
+  //       },
+  //       {
+  //         $set: {
+  //           paymentStatus: 'Failed',
+  //           bookingStatus: 'Cancelled'
+  //         }
+  //       }
+  //     );
+  //   //   console.log(`Updated ${updatedOrders.modifiedCount} orders.`);
+  //   } catch (error) {
+  //     console.error('Error updating unpaid orders:', error);
+  //     if (next) {
+  //       return next(error);
+  //     }
+  //   }
+  // };
 
-export const Order = mongoose.model("Order", orderSchema);
+  orderSchema.index({ order_expire: 1 }, { expireAfterSeconds: 0 });
+  export const Order = mongoose.model("Order", orderSchema);

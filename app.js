@@ -49,7 +49,7 @@ app.use("/api/v1/user", userRoute);
 app.use("/api/v1/cab", cabRoute);
 app.use("/api/v1/order", orderRoute);
 app.use("/api/v1/driver", driverRoute);
-app.use("/admin/v1", adminRoute);
+app.use("/api/v1/admin", adminRoute);
 
 
 

@@ -26,6 +26,7 @@ export const bookCab = async (req, res, next) => {
       bookedCab,
       exactLocation,
       departureDate,
+      dropOffDate,
       pickupLocation,
       destination,
       numberOfPassengers,
@@ -56,13 +57,15 @@ export const bookCab = async (req, res, next) => {
     } else if (paymentMethod === 'Cash') {
       razorpayOrderId = generateNumericOTP(9);
     }
-
+    const expireMinutes = parseInt(process.env.ORDER_EXPIRE, 10) || 15; // Default to 15 minutes if not set
+    const orderExpireDate = paymentMethod === 'Cash' ? null : new Date(Date.now() + expireMinutes * 60 * 1000);
     const orderOptions = {
       userId,
       bookingType,
       bookedCab,
       exactLocation,
       departureDate,
+      dropOffDate,
       pickupLocation,
       destination,
       numberOfPassengers,
@@ -73,16 +76,29 @@ export const bookCab = async (req, res, next) => {
       bookingAmount,
       paidAmount: 0, // Initialize as 0, update after successful payment
       razorpayOrderId,
+      order_expire: orderExpireDate,
     };
 
-    // CacheStorage.del(['pending_orders']);  
-    Cachestorage.del(['pending_orders']);
-    const order = await Order.create(orderOptions);
+    const cashOptions = {
+      ...orderOptions,
+      order_expire: null,
+    };
+
+    Cachestorage.del(['pending_orders','all_bookings']);
+    
+    let order;
+
+    if (paymentMethod === 'Hybrid' || paymentMethod === 'Online') {
+      order = order = await Order.create(orderOptions);
+    } else if (paymentMethod === 'Cash') {
+      order = order = await Order.create(cashOptions)
+    }
 
     res.status(201).json({
       success: true,
       order,
-      amountToPay: amountToPay / 100, // Convert back to rupees for client
+      amountToPay: amountToPay / 100,// Convert back to rupees for client
+      razorpayOrderId, 
     });
   } catch (error) {
     console.error("Error in bookCab:", error);
@@ -118,12 +134,15 @@ export const paymentVerification = async (req, res) => {
         razorpay_payment_id,
         razorpay_signature,
       });
-
-      order.paymentStatus = 'Paid';
+      
       if (order.paymentMethod === 'Hybrid') {
-        order.paidAmount = order.bookingAmount * 0.1;
+        order.paidAmount = Math.round(order.bookingAmount * 0.1);
+        order.paymentStatus = 'Partially-Paid';
+        order.order_expire = null;
       } else if (order.paymentMethod === 'Online') {
         order.paidAmount = order.bookingAmount;
+        order.paymentStatus = 'Paid';
+        order.order_expire = null;
       }
       await order.save();
 
@@ -151,22 +170,30 @@ export const paymentVerification = async (req, res) => {
 export const getMyBookings = async (req, res, next) => {
   try {
     const orders = await Order.find({ userId: req.user._id })
-     .populate({ path: "userId", select: "name" })
-     .select("-__v")
-     .lean();
+      .populate({ path: "userId", select: "name" })
+      .select("-__v");
+
+    // Check and update booking status for each order using Promise.allSettled
+    // const results = await Promise.allSettled(orders.map(order => order.checkBooking()));
+
+ 
+
+    // Convert the Mongoose documents to plain JavaScript objects
+    const leanOrders = orders.map(order => order.toObject());
+
     res.status(200).json({
       success: true,
-      orders,
+      orders: leanOrders,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'An error occurred while fetching bookings.' });
   }
-  
 };
 
+
 export const getOrderDetail = async(req,res,next)=>{
-  const orderCache = new NodeCache({ stdTTL: 300 });
+  const orderCache = new NodeCache({ stdTTL: 200 });
   try {
     const cachedOrder = orderCache.get(req.params.id);
     if(cachedOrder){
@@ -201,7 +228,7 @@ export const  getAllPendingOrder = async(req,res,next) =>{
         message: "Access denied. Only Drivers are allowed to register their car here.",
       });
     }
-
+  
     let orders;
     if(Cachestorage.has('pending_orders')){
       orders = JSON.parse(Cachestorage.get('pending_orders'));
@@ -211,8 +238,8 @@ export const  getAllPendingOrder = async(req,res,next) =>{
       Cachestorage.set(cacheKey,JSON.stringify(orders));
     }
     if(orders.length === 0){
-      return res.status(200).json({
-        success: true,
+      return res.status(400).json({
+        success: false,
         message:"No Order Found",
       })
     }
