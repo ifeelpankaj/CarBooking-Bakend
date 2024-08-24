@@ -64,14 +64,24 @@ export const setRateForCab = async (req, res) => {
 
         const updatedCab = await Cab.findById(cabId);
 
+
+
         if (!updatedCab) {
             return res.status(404).json({
                 success: false,
                 message: "Cab not found.",
             });
         }
-        updatedCab.rate = rate;
-        await updatedCab.save();
+        if (rate === 1) {
+            updatedCab.rate = rate;
+            updatedCab.isReady = false;
+            await updatedCab.save();
+        } else {
+            updatedCab.rate = rate;
+            updatedCab.isReady = true;
+            await updatedCab.save();
+        }
+
 
         //  send an email to the cab owner
         const cabOwner = await User.findById(updatedCab.belongsTo);
@@ -281,6 +291,98 @@ export const allBookings = async (req, res) => {
         throw new Error('Error fetching cabs: ' + error.message);
     }
 };
+export const getBookingStats = async (req, res) => {
+    try {
+        if (req.user.role !== "Admin") {
+            return res.status(403).json({
+                success: false,
+                message: "Access denied. Only Admins are allowed to Use this Route.",
+            });
+        }
+
+        const stats = await Order.aggregate([
+            {
+                $group: {
+                    _id: null,
+                    totalBookings: { $sum: 1 },
+                    totalRevenue: { $sum: "$bookingAmount" },
+                    averageBookingAmount: { $avg: "$bookingAmount" }
+                }
+            }
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: stats[0]
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching booking stats: ' + error.message
+        });
+    }
+};
+// export const allBookings = async (req, res) => {
+//     try {
+//         Cachestorage.del(['all_bookings'])
+//         if (req.user.role !== "Admin") {
+//             return res.status(403).json({
+//                 success: false,
+//                 message: "Access denied. Only Admins are allowed to Use this Route.",
+//             });
+//         }
+
+//         const page = parseInt(req.query.page) || 1;
+//         const limit = parseInt(req.query.limit) || 5;
+//         const skip = (page - 1) * limit;
+
+//         // Parse filter parameters
+//         const filters = {};
+//         if (req.query.pickupLocation) filters.pickupLocation = new RegExp(req.query.pickupLocation, 'i');
+//         if (req.query.destination) filters.destination = new RegExp(req.query.destination, 'i');
+//         if (req.query.bookingStatus) filters.bookingStatus = req.query.bookingStatus;
+//         if (req.query.paymentMethod) filters.paymentMethod = req.query.paymentMethod;
+
+//         let allBookings;
+//         if (Cachestorage.has("all_bookings")) {
+//             allBookings = JSON.parse(Cachestorage.get("all_bookings"));
+//         } else {
+//             allBookings = await Order.find().sort({ createdAt: -1 });
+//             Cachestorage.set("all_bookings", JSON.stringify(allBookings));
+//         }
+
+//         // Apply filters
+//         let filteredBookings = allBookings;
+//         if (Object.keys(filters).length > 0) {
+//             filteredBookings = allBookings.filter(booking => {
+//                 return Object.entries(filters).every(([key, value]) => {
+//                     if (key === 'pickupLocation' || key === 'destination') {
+//                         return booking[key].match(value);
+//                     }
+//                     return booking[key] === value;
+//                 });
+//             });
+//         }
+
+//         // Apply pagination
+//         const totalCount = filteredBookings.length;
+//         const paginatedBookings = filteredBookings.slice(skip, skip + limit);
+
+//         res.status(200).json({
+//             success: true,
+//             count: paginatedBookings.length,
+//             totalCount: totalCount,
+//             currentPage: page,
+//             totalPages: Math.ceil(totalCount / limit),
+//             data: paginatedBookings,
+//         });
+//     } catch (error) {
+//         res.status(500).json({
+//             success: false,
+//             message: 'Error fetching bookings: ' + error.message
+//         });
+//     }
+// };
 
 export const updateBookedCab = async (req, res) => {
     if (req.user.role !== "Admin") {
@@ -327,14 +429,14 @@ export const updateBookedCab = async (req, res) => {
         cab.addBooking(id, order.departureDate, order.dropOffDate);
         cab.updateUpcomingBookings();
         const result = await cab.save();
-        if(!result){
-            res.status(404).json({ message: "Error with assigning the cab"});
+        if (!result) {
+            res.status(404).json({ message: "Error with assigning the cab" });
         }
-        
+
         // Clear cache
-       
-            Cachestorage.del(['all_bookigs','all_cabs','driver_cabs','pending_orders']);
-        
+
+        Cachestorage.del(['all_bookings', 'all_cabs', 'driver_cabs', 'pending_orders']);
+
 
         res.status(200).json({
             message: "Cab assigned successfully",
@@ -414,7 +516,7 @@ export const getDriverInfoById = async (req, res) => {
             avatar: driver.avatar,
             createdAt: driver.createdAt,
             cab: {
-                cabId:cab._id,
+                cabId: cab._id,
                 modelName: cab.modelName,
                 type: cab.type,
                 capacity: cab.capacity,
@@ -445,7 +547,7 @@ export const verifyDriver = async (req, res) => {
                 message: "Access denied. Only Admins are allowed to use this route.",
             });
         }
-        Cachestorage.del(['all_user','all_drivers'])
+        Cachestorage.del(['all_user', 'all_drivers'])
         const { id } = req.params;
         const { flag } = req.body;
 
@@ -466,16 +568,17 @@ export const verifyDriver = async (req, res) => {
             return res.status(400).json({ success: false, message: "Driver has no car registered." });
         }
 
-        if (!driver.isDocumentSubmited) {
+        if (driver.driverDocuments<=0) {
             return res.status(400).json({ success: false, message: "Driver has not submitted the necessary documents." });
         }
 
         // Verify the driver
         const updatedDriver = await User.findByIdAndUpdate(
             id,
-            { isVerifiedDriver: flag },
+            { isDocumentSubmited: flag },
             { new: true, runValidators: true }
         );
+     
 
         if (!updatedDriver) {
             return res.status(500).json({ success: false, message: "Error in verifying the driver." });

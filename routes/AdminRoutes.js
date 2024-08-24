@@ -1,5 +1,5 @@
 import express from "express";
-import { allBookings, allCabs, allDrivers, allUser, getAvailableCabs, getCabById, getDriverInfoById, getUserById, setRateForCab, updateBookedCab, verifyDriver } from "../controllers/AdminController.js";
+import { allBookings, allCabs, allDrivers, allUser, getAvailableCabs, getBookingStats, getCabById, getDriverInfoById, getUserById, setRateForCab, updateBookedCab, verifyDriver } from "../controllers/AdminController.js";
 import { isAuthenticated } from "../middleware/auth.js";
 
 
@@ -15,6 +15,8 @@ router.route("/all-cabs").get(isAuthenticated, allCabs);
 router.route("/all-users").get(isAuthenticated, allUser);
 
 router.route("/all-bookings").get(isAuthenticated, allBookings);
+
+router.route("/booking-stats").get(isAuthenticated, getBookingStats);
 
 router.route("/all-drivers").get(isAuthenticated, allDrivers);
 

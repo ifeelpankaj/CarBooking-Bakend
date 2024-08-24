@@ -171,7 +171,8 @@ export const getMyBookings = async (req, res, next) => {
   try {
     const orders = await Order.find({ userId: req.user._id })
       .populate({ path: "userId", select: "name" })
-      .select("-__v");
+      .select("-__v")
+      .sort({ createdAt: -1 });
 
     // Check and update booking status for each order using Promise.allSettled
     // const results = await Promise.allSettled(orders.map(order => order.checkBooking()));
