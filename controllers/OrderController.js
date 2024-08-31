@@ -1,13 +1,14 @@
 import { Order } from "../models/OrderModel.js";
 import { instance } from "../server.js";
-import {Payment} from "../models/PaymentModel.js";
-import  crypto from "node:crypto";
+import { Payment } from "../models/PaymentModel.js";
+import crypto from "node:crypto";
 import NodeCache from "node-cache";
 import { Cachestorage } from "../app.js";
+import OrderServices from "../operations/OrderServices.js";
 
 //pending_orders
 export const bookCab = async (req, res, next) => {
-  
+
 
   function generateNumericOTP(length) {
     let digits = '123456789';
@@ -84,21 +85,21 @@ export const bookCab = async (req, res, next) => {
       order_expire: null,
     };
 
-    Cachestorage.del(['pending_orders','all_bookings']);
-    
+    Cachestorage.del(['pending_orders', 'all_bookings']);
+
     let order;
 
     if (paymentMethod === 'Hybrid' || paymentMethod === 'Online') {
-      order = order = await Order.create(orderOptions);
+      order = await Order.create(orderOptions);
     } else if (paymentMethod === 'Cash') {
-      order = order = await Order.create(cashOptions)
+      order = await Order.create(cashOptions)
     }
 
     res.status(201).json({
       success: true,
       order,
       amountToPay: amountToPay / 100,// Convert back to rupees for client
-      razorpayOrderId, 
+      razorpayOrderId,
     });
   } catch (error) {
     console.error("Error in bookCab:", error);
@@ -134,7 +135,7 @@ export const paymentVerification = async (req, res) => {
         razorpay_payment_id,
         razorpay_signature,
       });
-      
+
       if (order.paymentMethod === 'Hybrid') {
         order.paidAmount = Math.round(order.bookingAmount * 0.1);
         order.paymentStatus = 'Partially-Paid';
@@ -167,24 +168,18 @@ export const paymentVerification = async (req, res) => {
 };
 
 
-export const getMyBookings = async (req, res, next) => {
+export const getMyBookings = async (req, res) => {
   try {
-    const orders = await Order.find({ userId: req.user._id })
-      .populate({ path: "userId", select: "name" })
-      .select("-__v")
-      .sort({ createdAt: -1 });
 
-    // Check and update booking status for each order using Promise.allSettled
-    // const results = await Promise.allSettled(orders.map(order => order.checkBooking()));
-
- 
-
-    // Convert the Mongoose documents to plain JavaScript objects
-    const leanOrders = orders.map(order => order.toObject());
+    const query = { userId: req.user._id };
+    const populateField = { path: 'userId', select: 'name' };
+    const selectField = '-__v';
+    const sorting = { createdAt: -1 };
+    const orders = await OrderServices.findOrders(query, populateField, selectField, sorting);
 
     res.status(200).json({
       success: true,
-      orders: leanOrders,
+      orders: orders,
     });
   } catch (error) {
     console.error(error);
@@ -193,27 +188,30 @@ export const getMyBookings = async (req, res, next) => {
 };
 
 
-export const getOrderDetail = async(req,res,next)=>{
-  const orderCache = new NodeCache({ stdTTL: 200 });
+export const getOrderDetail = async (req, res, next) => {
+
+  const orderCache = new NodeCache({ stdTTL: 0 });
+
   try {
     const cachedOrder = orderCache.get(req.params.id);
-    if(cachedOrder){
+    if (cachedOrder) {
       return res.status(200).json({
-        success:true,
-        order:cachedOrder,
+        success: true,
+        order: cachedOrder,
       })
     }
-
-    const order = await Order.findById(req.params.id).lean();
-    if(!order){
+    const query = { _id: req.params.id };
+    const order = await OrderServices.findOrders(query);
+    // const order =  await Order.findById(req.params.id);
+    if (!order) {
       return res.status(404).json({
-        success:false,
-        message:"Order Not found",
+        success: false,
+        message: "Order Not found",
       })
     }
-    orderCache.set(req.params.id,order);
+    orderCache.set(req.params.id, order);
     res.status(200).json({
-      success:true,
+      success: true,
       order,
     })
   } catch (error) {
@@ -221,27 +219,29 @@ export const getOrderDetail = async(req,res,next)=>{
   }
 }
 
-export const  getAllPendingOrder = async(req,res,next) =>{
+export const getAllPendingOrder = async (req, res, next) => {
   try {
+    Cachestorage.del('pending_orders');
     if (req.user.role !== "Driver" && req.user.role !== "Admin") {
       return res.status(403).json({
         success: false,
         message: "Access denied. Only Drivers are allowed to register their car here.",
       });
     }
-  
+
     let orders;
-    if(Cachestorage.has('pending_orders')){
+    if (Cachestorage.has('pending_orders')) {
       orders = JSON.parse(Cachestorage.get('pending_orders'));
-    }else{
-      orders = await Order.find({bookingStatus : "Pending"}).select('-_v');
+    } else {
+      const query = { bookingStatus: 'Pending' }
+      orders = await OrderServices.findOrders(query);
       const cacheKey = 'pending_orders';
-      Cachestorage.set(cacheKey,JSON.stringify(orders));
+      Cachestorage.set(cacheKey, JSON.stringify(orders));
     }
-    if(orders.length === 0){
+    if (orders.length === 0) {
       return res.status(400).json({
         success: false,
-        message:"No Order Found",
+        message: "No Order Found",
       })
     }
     res.status(200).json({

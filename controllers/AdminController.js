@@ -1,5 +1,5 @@
 import { User } from "../models/UserModel.js";
-import { Cab } from "../models/cabModel.js";
+import { Cab } from "../models/CabModel.js";
 import { sendMail } from "../utils/sendEmail.js";
 import { Cachestorage } from "../app.js";
 import { Order } from "../models/OrderModel.js";

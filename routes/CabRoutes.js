@@ -22,6 +22,7 @@ router.route("/getRide/:id").delete(isAuthenticated,deleteCab);
 
 router.route("/calculate-distance").get(isAuthenticated,calculateDistance);
 
+//Not used Anywhere
 router.route("/get-upcomming-booking/:cabId").get(isAuthenticated,getCabWithUpcomingBookings);
 
 
